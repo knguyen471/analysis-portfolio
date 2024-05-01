@@ -1,0 +1,90 @@
+-- Dataset: Movie Data Analytics Dataset
+-- Source: Kaggle https://www.kaggle.com/datasets/shahjhanalam/movie-data-analytics-dataset
+-- Queried using: SQLite
+-- See full notebook in Kaggle: https://www.kaggle.com/code/khanhtnguyen/sql-movies-analysis
+
+
+-- 1. Rank genres by average rating
+SELECT 
+    DENSE_RANK() OVER (ORDER BY AVG(Rating) DESC) as rank,
+    genre,
+    ROUND(AVG(Rating), 2) AS avg_rating
+FROM IMDB i
+JOIN genre g
+ON i.Movie_id = g.Movie_id
+WHERE genre != ""
+GROUP BY genre
+ORDER BY avg_rating DESC;
+
+
+-- 2. What are the top 5 lowest-rating movies? What are their genres, budgets, and runtimes?
+SELECT 
+    Title,
+    Rating,
+    genre as Genre,
+    Budget,
+    Runtime
+FROM IMDB i
+JOIN genre g
+ON i.Movie_id = g.Movie_id
+ORDER BY Rating ASC
+LIMIT 5;
+
+-- Looks like there are duplicate `Titles` in the `genre` table so the result doesn't include all 5 movies. Let's improve this query.`
+
+
+SELECT 
+    Title,
+    Rating,
+    genre as Genre,
+    Budget,
+    Runtime
+FROM IMDB i
+JOIN genre g
+ON i.Movie_id = g.Movie_id
+WHERE Title IN (
+    SELECT Title
+    FROM IMDB
+    ORDER BY Rating ASC
+    LIMIT 5
+);
+
+
+-- 3.  Are the budgets of the top 5 highest-rated movies higher than those of the top 5 lowest-rated movies?
+WITH highest_rated AS (
+    SELECT Title
+    FROM IMDB
+    ORDER BY Rating DESC
+    LIMIT 5
+),
+
+lowest_rated AS (
+    SELECT Title
+    FROM IMDB
+    ORDER BY Rating ASC
+    LIMIT 5
+)
+
+SELECT 
+    Title,
+    CASE
+        WHEN Title IN (SELECT Title FROM highest_rated) THEN "Highest-rated"
+        WHEN Title IN (SELECT Title FROM lowest_rated) THEN "Lowest-rated"
+    END AS Type,
+    Rating,
+    Worldwide AS Earning
+FROM IMDB i
+JOIN earning e
+ON i.Movie_id = e.Movie_id
+WHERE Title in (SELECT Title FROM highest_rated) OR Title IN (SELECT Title FROM lowest_rated)
+ORDER BY earning DESC;
+
+
+-- 4. What is the average runtime by year?
+-- Note: SQLite doesn't support RIGHT(), so we'll use TRIM() and SUBSTR() instead.
+SELECT
+    TRIM(SUBSTR(Title, LENGTH(Title) - 5), "()") AS Year,
+    ROUND(AVG(Runtime), 2) as Runtime
+FROM IMDB
+GROUP BY Year
+
